@@ -558,100 +558,127 @@ with col3:
 
 # Document Upload & Analysis Section
 st.markdown("---")
-st.markdown("## 📄 Document Upload & AI Analysis")
-st.markdown("Upload your legal documents (contracts, agreements, notices) for AI-powered analysis")
 
-# File size limit (10 MB)
-MAX_FILE_SIZE_MB = 10
-MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+# Custom CSS for document analysis section
+st.markdown("""
+<style>
+    .doc-upload-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 25px;
+        border-radius: 15px;
+        margin: 20px 0;
+    }
+    
+    .doc-upload-title {
+        color: white;
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+    
+    .doc-upload-subtitle {
+        color: rgba(255,255,255,0.9);
+        font-size: 14px;
+        margin-bottom: 15px;
+    }
+    
+    .analysis-card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin: 15px 0;
+    }
+    
+    .analysis-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 10px 10px 0 0;
+        margin: -20px -20px 15px -20px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-uploaded_file = st.file_uploader(
-    "📎 Choose a legal document to analyze",
-    type=['pdf', 'docx', 'doc', 'png', 'jpg', 'jpeg'],
-    help=f"Supported formats: PDF, Word (DOCX), Images. Max size: {MAX_FILE_SIZE_MB}MB"
-)
+# Header section
+st.markdown('<div class="doc-upload-container">', unsafe_allow_html=True)
+st.markdown('<div class="doc-upload-title">📄 Document Analysis</div>', unsafe_allow_html=True)
+st.markdown('<div class="doc-upload-subtitle">Upload legal documents for instant AI-powered analysis</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Compact file uploader in columns
+col_upload, col_info = st.columns([2, 1])
+
+with col_upload:
+    MAX_FILE_SIZE_MB = 10
+    MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+    
+    uploaded_file = st.file_uploader(
+        "Choose document",
+        type=['pdf', 'docx', 'doc'],
+        help=f"PDF or Word files, max {MAX_FILE_SIZE_MB}MB",
+        label_visibility="collapsed"
+    )
+
+with col_info:
+    st.info("**Supported:**\n- 📕 PDF\n- 📘 Word\n- 🔒 Private")
 
 if uploaded_file is not None:
-    # Check file size
+    # File size check
     if uploaded_file.size > MAX_FILE_SIZE_BYTES:
-        st.error(f"❌ File too large! Please upload files under {MAX_FILE_SIZE_MB}MB. Current file: {uploaded_file.size / (1024*1024):.2f}MB")
+        st.error(f"⚠️ File too large ({uploaded_file.size / (1024*1024):.1f}MB). Max: {MAX_FILE_SIZE_MB}MB")
     else:
-        # Show file details
+        # Compact file info
         file_info = get_file_info(uploaded_file) if DOCUMENT_PROCESSING_AVAILABLE else {'name': uploaded_file.name, 'size_kb': uploaded_file.size / 1024}
         
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.success(f"✅ File uploaded: **{file_info['name']}**")
-        with col_b:
-            st.info(f"📊 File size: **{file_info['size_kb']:.2f} KB**")
-        
-        # Privacy Notice
-        st.caption("🔒 **Privacy:** Your document is processed in memory only and is NOT saved on our servers.")
-        
-        # Analyze button
-        if st.button("🔍 Analyze Document with AI", type="primary", use_container_width=True):
-            if not DOCUMENT_PROCESSING_AVAILABLE:
-                st.error("❌ Document processing libraries not installed. Please install PyPDF2, python-docx, and Pillow.")
-            else:
-                with st.spinner("🤖 AI is analyzing your document... This may take 30-60 seconds."):
-                    
-                    # Step 1: Extract text from document
-                    progress_bar = st.progress(0)
-                    st.info("📄 Step 1/3: Extracting text from document...")
-                    progress_bar.progress(33)
-                    
-                    document_text = process_document(uploaded_file)
-                    
-                    if "Error" in document_text or "not yet implemented" in document_text:
-                        progress_bar.empty()
-                        st.error(f"❌ {document_text}")
-                    else:
-                        # Step 2: Show extracted text preview
-                        st.success(f"✅ Extracted {len(document_text)} characters successfully!")
-                        progress_bar.progress(66)
+        col1, col2, col3 = st.columns([2, 1, 1])
+        with col1:
+            st.success(f"✅ **{file_info['name'][:30]}...**" if len(file_info['name']) > 30 else f"✅ **{file_info['name']}**")
+        with col2:
+            st.metric("Size", f"{file_info['size_kb']:.1f} KB")
+        with col3:
+            if st.button("🔍 Analyze", type="primary", use_container_width=True):
+                if not DOCUMENT_PROCESSING_AVAILABLE:
+                    st.error("❌ Install required libraries")
+                else:
+                    with st.spinner("🤖 Analyzing..."):
+                        # Extract text
+                        progress = st.progress(0, text="Extracting text...")
+                        document_text = process_document(uploaded_file)
+                        progress.progress(50, text="Analyzing with AI...")
                         
-                        # Optional: Show extracted text
-                        st.info("📄 Step 2/3: Preparing document for analysis...")
-                        with st.expander("📝 View Extracted Text (Click to expand)"):
-                            st.text_area(
-                                "Document Content", 
-                                document_text[:2000] + ("..." if len(document_text) > 2000 else ""), 
-                                height=200,
-                                disabled=True
-                            )
-                        
-                        # Step 3: Perform AI analysis
-                        st.info("🧠 Step 3/3: AI is analyzing legal aspects...")
-                        progress_bar.progress(90)
-                        
-                        analysis = analyze_legal_document(document_text, uploaded_file.name)
-                        
-                        progress_bar.progress(100)
-                        progress_bar.empty()
-                        
-                        # Step 4: Display analysis results
-                        st.markdown("---")
-                        st.markdown("## 🎯 AI Legal Analysis Results")
-                        st.markdown(analysis)
-                        
-                        # Download analysis report
-                        st.markdown("---")
-                        analysis_report = f"""LEGAL DOCUMENT ANALYSIS REPORT
-Generated by AI-Powered Legal Chat Bot
+                        if "Error" in document_text or "not yet implemented" in document_text:
+                            progress.empty()
+                            st.error(f"❌ {document_text}")
+                        else:
+                            # AI Analysis
+                            analysis = analyze_legal_document(document_text, uploaded_file.name)
+                            progress.progress(100, text="Complete!")
+                            progress.empty()
+                            
+                            # Display in styled card
+                            st.markdown('<div class="analysis-card">', unsafe_allow_html=True)
+                            st.markdown('<div class="analysis-header"><h3 style="margin:0; color:white;">🎯 Analysis Results</h3></div>', unsafe_allow_html=True)
+                            
+                            # Display analysis with better formatting
+                            st.markdown(analysis)
+                            
+                            st.markdown('</div>', unsafe_allow_html=True)
+                            
+                            # Compact download in expander
+                            with st.expander("📥 Download Report"):
+                                analysis_report = f"""LEGAL DOCUMENT ANALYSIS
 Document: {uploaded_file.name}
-Analysis Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}
+Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}
 
 {analysis}
 """
-                        st.download_button(
-                            label="📥 Download Analysis Report (TXT)",
-                            data=analysis_report,
-                            file_name=f"analysis_{uploaded_file.name.rsplit('.', 1)[0]}.txt",
-                            mime="text/plain",
-                            use_container_width=True
-                        )
-                        
-                        st.success("✅ Analysis complete! Review the results above and download the report if needed.")
+                                st.download_button(
+                                    "Download TXT",
+                                    analysis_report,
+                                    f"analysis_{uploaded_file.name.rsplit('.', 1)[0]}.txt",
+                                    use_container_width=True
+                                )
 
 # Templates section continues below
 # Folder where templates are stored
