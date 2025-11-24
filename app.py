@@ -465,12 +465,16 @@ if 'show_doc_analysis' not in st.session_state:
 
 # Show document analysis if button was clicked - APPEARS FIRST
 if st.session_state.show_doc_analysis:
-    # Auto-scroll to top using JavaScript
-    st.markdown("""
-    <script>
-        window.parent.document.querySelector('section.main').scrollTo(0, 0);
-    </script>
-    """, unsafe_allow_html=True)
+    # Auto-scroll to top using Streamlit components (more reliable)
+    import streamlit.components.v1 as components
+    components.html(
+        """
+        <script>
+            window.parent.document.querySelector('section.main').scrollTo({top: 0, behavior: 'smooth'});
+        </script>
+        """,
+        height=0,
+    )
     
     st.markdown("---")
     
