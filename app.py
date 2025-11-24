@@ -690,10 +690,79 @@ with col3:
 # Sidebar - Document Analysis Button
 st.sidebar.markdown("---")
 st.sidebar.markdown("**📄 Document Analysis**")
-if st.sidebar.button("Analyze Document", use_container_width=True, type="primary"):
-    st.session_state.show_doc_analysis = not st.session_state.get('show_doc_analysis', False)
-    st.rerun()
 
+@st.dialog("📄 Document Analysis", width="large")
+def show_document_analyzer():
+    """Document analysis in a modal dialog"""
+    st.markdown("Upload your legal documents for AI-powered analysis")
+    
+    # File uploader
+    MAX_FILE_SIZE_MB = 10
+    MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+    
+    col_upload, col_info = st.columns([3, 1])
+    
+    with col_upload:
+        uploaded_file = st.file_uploader(
+            "Choose document",
+            type=['pdf', 'docx', 'doc'],
+            help=f"PDF or Word files, max {MAX_FILE_SIZE_MB}MB",
+            key="doc_analyzer_modal"
+        )
+    
+    with col_info:
+        st.info("**Supported:**\n- 📕 PDF\n- 📘 Word\n- 🔒 Private")
+    
+    if uploaded_file is not None:
+        if uploaded_file.size > MAX_FILE_SIZE_BYTES:
+            st.error(f"⚠️ File too large ({uploaded_file.size / (1024*1024):.1f}MB). Max: {MAX_FILE_SIZE_MB}MB")
+        else:
+            file_info = get_file_info(uploaded_file) if DOCUMENT_PROCESSING_AVAILABLE else {'name': uploaded_file.name, 'size_kb': uploaded_file.size / 1024}
+            
+            col1, col2, col3 = st.columns([2, 1, 1])
+            with col1:
+                st.success(f"✅ **{file_info['name'][:30]}...**" if len(file_info['name']) > 30 else f"✅ **{file_info['name']}**")
+            with col2:
+                st.metric("Size", f"{file_info['size_kb']:.1f} KB")
+            with col3:
+                analyze_clicked = st.button("🔍 Analyze", type="primary", use_container_width=True, key="analyze_modal_btn")
+            
+            if analyze_clicked:
+                if not DOCUMENT_PROCESSING_AVAILABLE:
+                    st.error("❌ Install required libraries")
+                else:
+                    with st.spinner("🤖 Analyzing..."):
+                        progress = st.progress(0, text="Extracting text...")
+                        document_text = process_document(uploaded_file)
+                        progress.progress(50, text="Analyzing with AI...")
+                        
+                        if "Error" in document_text or "not yet implemented" in document_text:
+                            progress.empty()
+                            st.error(f"❌ {document_text}")
+                        else:
+                            analysis = analyze_legal_document(document_text, uploaded_file.name)
+                            progress.progress(100, text="Complete!")
+                            progress.empty()
+                            
+                            st.markdown("### 🎯 Analysis Results")
+                            st.markdown(analysis)
+                            
+                            with st.expander("📥 Download Report"):
+                                analysis_report = f"""LEGAL DOCUMENT ANALYSIS
+Document: {uploaded_file.name}
+Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}
+
+{analysis}
+"""
+                                st.download_button(
+                                    "Download TXT",
+                                    analysis_report,
+                                    f"analysis_{uploaded_file.name.rsplit('.', 1)[0]}.txt",
+                                    use_container_width=True
+                                )
+
+if st.sidebar.button("Open Document Analyzer", use_container_width=True, type="primary"):
+    show_document_analyzer()
 
 
 # Templates section continues below
