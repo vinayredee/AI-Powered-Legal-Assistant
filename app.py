@@ -678,9 +678,11 @@ with col3:
 
 # Sidebar - Document Analysis Button
 st.sidebar.markdown("---")
-if st.sidebar.button("📄 Analyze Document", use_container_width=True, type="primary"):
+st.sidebar.markdown("**📄 Document Analysis**")
+if st.sidebar.button("Analyze Document\n(Click & scroll up ↑)", use_container_width=True, type="primary"):
     st.session_state.show_doc_analysis = not st.session_state.get('show_doc_analysis', False)
     st.rerun()
+st.sidebar.caption("💡 After clicking, scroll to top to upload")
 
 
 # Templates section continues below
