@@ -10,3 +10,6 @@ gTTS
 pygame
 google-generativeai
 pyaudio
+PyPDF2
+python-docx
+Pillow

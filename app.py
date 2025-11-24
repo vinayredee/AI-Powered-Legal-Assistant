@@ -14,6 +14,13 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
+# Import document processor
+try:
+    from document_processor import process_document, get_file_info
+    DOCUMENT_PROCESSING_AVAILABLE = True
+except ImportError:
+    DOCUMENT_PROCESSING_AVAILABLE = False
+
 # Initialize text-to-speech engine safely
 engine = None
 try:
@@ -170,6 +177,82 @@ def get_response(query):
     
     st.session_state.conversation_context.append(f"Assistant: {response}")
     return response, False
+
+def analyze_legal_document(document_text, document_name):
+    """Analyze legal document using Gemini API"""
+    
+    if not GEMINI_AVAILABLE:
+        return "❌ AI analysis not available. Please ensure Gemini API is configured."
+    
+    try:
+        # Get API key
+        api_key = None
+        if hasattr(st, 'secrets'):
+            api_key = st.secrets.get("GEMINI_API_KEY")
+        if not api_key:
+            api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            try:
+                import toml
+                secrets = toml.load(".streamlit/secrets.toml")
+                api_key = secrets.get("GEMINI_API_KEY")
+            except:
+                pass
+        
+        if not api_key:
+            return "❌ API key not configured. Please set up GEMINI_API_KEY in secrets."
+        
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        # Limit text length to avoid token limits (first 4000 characters)
+        text_sample = document_text[:4000] if len(document_text) > 4000 else document_text
+        
+        # Create detailed analysis prompt
+        prompt = f"""You are an expert legal document analyst specializing in Indian law.
+
+Document Name: {document_name}
+Document Length: {len(document_text)} characters
+
+Document Content:
+{text_sample}
+
+Provide a comprehensive legal analysis in the following format:
+
+## 📋 Document Summary
+[Brief overview of what this document is about in 2-3 sentences]
+
+## 🔍 Document Type
+[Identify the type: Contract, Agreement, Notice, License, Affidavit, etc.]
+
+## ⚖️ Key Legal Terms & Clauses
+[List the 5 most important clauses, sections, or legal terms found in the document]
+
+## ⚠️ Red Flags & Concerns
+[Identify any problematic clauses, unfair terms, ambiguous language, or potential legal risks]
+
+## ✅ Positive Aspects
+[Highlight protective clauses, fair terms, or legally sound provisions]
+
+## 📊 Legal Compliance Check
+[Assess if the document appears to comply with applicable Indian laws and regulations]
+
+## 💡 Recommendations
+[Provide 3-5 specific, actionable recommendations for the document holder]
+
+## 🚨 Critical Points to Note
+[Highlight the most important things the user must be aware of]
+
+---
+**Important Disclaimer:** This is an AI-generated analysis for informational purposes only. This does NOT constitute legal advice. Please consult a qualified lawyer for professional legal advice specific to your situation.
+"""
+        
+        response = model.generate_content(prompt)
+        return response.text
+        
+    except Exception as e:
+        return f"❌ Analysis error: {str(e)}\n\nPlease try again or consult the error logs."
+
 
 # Language Translation Dictionary
 translations = {
@@ -472,6 +555,105 @@ with col3:
             st.session_state.interaction_log.to_csv(index=False),
             file_name="interaction_history.csv"
         )
+
+# Document Upload & Analysis Section
+st.markdown("---")
+st.markdown("## 📄 Document Upload & AI Analysis")
+st.markdown("Upload your legal documents (contracts, agreements, notices) for AI-powered analysis")
+
+# File size limit (10 MB)
+MAX_FILE_SIZE_MB = 10
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
+uploaded_file = st.file_uploader(
+    "📎 Choose a legal document to analyze",
+    type=['pdf', 'docx', 'doc', 'png', 'jpg', 'jpeg'],
+    help=f"Supported formats: PDF, Word (DOCX), Images. Max size: {MAX_FILE_SIZE_MB}MB"
+)
+
+if uploaded_file is not None:
+    # Check file size
+    if uploaded_file.size > MAX_FILE_SIZE_BYTES:
+        st.error(f"❌ File too large! Please upload files under {MAX_FILE_SIZE_MB}MB. Current file: {uploaded_file.size / (1024*1024):.2f}MB")
+    else:
+        # Show file details
+        file_info = get_file_info(uploaded_file) if DOCUMENT_PROCESSING_AVAILABLE else {'name': uploaded_file.name, 'size_kb': uploaded_file.size / 1024}
+        
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.success(f"✅ File uploaded: **{file_info['name']}**")
+        with col_b:
+            st.info(f"📊 File size: **{file_info['size_kb']:.2f} KB**")
+        
+        # Privacy Notice
+        st.caption("🔒 **Privacy:** Your document is processed in memory only and is NOT saved on our servers.")
+        
+        # Analyze button
+        if st.button("🔍 Analyze Document with AI", type="primary", use_container_width=True):
+            if not DOCUMENT_PROCESSING_AVAILABLE:
+                st.error("❌ Document processing libraries not installed. Please install PyPDF2, python-docx, and Pillow.")
+            else:
+                with st.spinner("🤖 AI is analyzing your document... This may take 30-60 seconds."):
+                    
+                    # Step 1: Extract text from document
+                    progress_bar = st.progress(0)
+                    st.info("📄 Step 1/3: Extracting text from document...")
+                    progress_bar.progress(33)
+                    
+                    document_text = process_document(uploaded_file)
+                    
+                    if "Error" in document_text or "not yet implemented" in document_text:
+                        progress_bar.empty()
+                        st.error(f"❌ {document_text}")
+                    else:
+                        # Step 2: Show extracted text preview
+                        st.success(f"✅ Extracted {len(document_text)} characters successfully!")
+                        progress_bar.progress(66)
+                        
+                        # Optional: Show extracted text
+                        st.info("📄 Step 2/3: Preparing document for analysis...")
+                        with st.expander("📝 View Extracted Text (Click to expand)"):
+                            st.text_area(
+                                "Document Content", 
+                                document_text[:2000] + ("..." if len(document_text) > 2000 else ""), 
+                                height=200,
+                                disabled=True
+                            )
+                        
+                        # Step 3: Perform AI analysis
+                        st.info("🧠 Step 3/3: AI is analyzing legal aspects...")
+                        progress_bar.progress(90)
+                        
+                        analysis = analyze_legal_document(document_text, uploaded_file.name)
+                        
+                        progress_bar.progress(100)
+                        progress_bar.empty()
+                        
+                        # Step 4: Display analysis results
+                        st.markdown("---")
+                        st.markdown("## 🎯 AI Legal Analysis Results")
+                        st.markdown(analysis)
+                        
+                        # Download analysis report
+                        st.markdown("---")
+                        analysis_report = f"""LEGAL DOCUMENT ANALYSIS REPORT
+Generated by AI-Powered Legal Chat Bot
+Document: {uploaded_file.name}
+Analysis Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+{analysis}
+"""
+                        st.download_button(
+                            label="📥 Download Analysis Report (TXT)",
+                            data=analysis_report,
+                            file_name=f"analysis_{uploaded_file.name.rsplit('.', 1)[0]}.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                        
+                        st.success("✅ Analysis complete! Review the results above and download the report if needed.")
+
+# Templates section continues below
 # Folder where templates are stored
 TEMPLATES_FOLDER = "templates"
 
