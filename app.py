@@ -637,48 +637,52 @@ if uploaded_file is not None:
         with col2:
             st.metric("Size", f"{file_info['size_kb']:.1f} KB")
         with col3:
-            if st.button("🔍 Analyze", type="primary", use_container_width=True):
-                if not DOCUMENT_PROCESSING_AVAILABLE:
-                    st.error("❌ Install required libraries")
-                else:
-                    with st.spinner("🤖 Analyzing..."):
-                        # Extract text
-                        progress = st.progress(0, text="Extracting text...")
-                        document_text = process_document(uploaded_file)
-                        progress.progress(50, text="Analyzing with AI...")
+            analyze_clicked = st.button("🔍 Analyze", type="primary", use_container_width=True)
+        
+        # Analysis happens OUTSIDE columns for full width display
+        if analyze_clicked:
+            if not DOCUMENT_PROCESSING_AVAILABLE:
+                st.error("❌ Install required libraries")
+            else:
+                with st.spinner("🤖 Analyzing..."):
+                    # Extract text
+                    progress = st.progress(0, text="Extracting text...")
+                    document_text = process_document(uploaded_file)
+                    progress.progress(50, text="Analyzing with AI...")
+                    
+                    if "Error" in document_text or "not yet implemented" in document_text:
+                        progress.empty()
+                        st.error(f"❌ {document_text}")
+                    else:
+                        # AI Analysis
+                        analysis = analyze_legal_document(document_text, uploaded_file.name)
+                        progress.progress(100, text="Complete!")
+                        progress.empty()
                         
-                        if "Error" in document_text or "not yet implemented" in document_text:
-                            progress.empty()
-                            st.error(f"❌ {document_text}")
-                        else:
-                            # AI Analysis
-                            analysis = analyze_legal_document(document_text, uploaded_file.name)
-                            progress.progress(100, text="Complete!")
-                            progress.empty()
-                            
-                            # Display in styled card
-                            st.markdown('<div class="analysis-card">', unsafe_allow_html=True)
-                            st.markdown('<div class="analysis-header"><h3 style="margin:0; color:white;">🎯 Analysis Results</h3></div>', unsafe_allow_html=True)
-                            
-                            # Display analysis with better formatting
-                            st.markdown(analysis)
-                            
-                            st.markdown('</div>', unsafe_allow_html=True)
-                            
-                            # Compact download in expander
-                            with st.expander("📥 Download Report"):
-                                analysis_report = f"""LEGAL DOCUMENT ANALYSIS
+                        # Display in styled card at FULL WIDTH
+                        st.markdown('<div class="analysis-card">', unsafe_allow_html=True)
+                        st.markdown('<div class="analysis-header"><h3 style="margin:0; color:white;">🎯 Analysis Results</h3></div>', unsafe_allow_html=True)
+                        
+                        # Display analysis with better formatting
+                        st.markdown(analysis)
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
+                        # Compact download in expander
+                        with st.expander("📥 Download Report"):
+                            analysis_report = f"""LEGAL DOCUMENT ANALYSIS
 Document: {uploaded_file.name}
 Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}
 
 {analysis}
 """
-                                st.download_button(
-                                    "Download TXT",
-                                    analysis_report,
-                                    f"analysis_{uploaded_file.name.rsplit('.', 1)[0]}.txt",
-                                    use_container_width=True
-                                )
+                            st.download_button(
+                                "Download TXT",
+                                analysis_report,
+                                f"analysis_{uploaded_file.name.rsplit('.', 1)[0]}.txt",
+                                use_container_width=True
+                            )
+
 
 # Templates section continues below
 # Folder where templates are stored
